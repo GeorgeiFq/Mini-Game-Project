@@ -1,0 +1,708 @@
+; Lab 6 - 16x2 LCD display
+  
+			area Lab6, code, readonly
+RS			equ 0x20	; RS connects to P3.5
+RW			equ 0x40	; RW connects to P3.6
+EN			equ 0x80	; EN connects to P3.7
+
+
+			export __main
+
+__main		proc	
+
+			bl LCDInit ;Initialize display
+			bl gameSelect ;Display whackamole text
+menu		b menu
+
+gameStart	
+			bl LEDInit
+			mov r6, #10
+			
+			mov r3, #0x0C
+			strb r3, [r4, #0x02]
+start			
+			bl threeMid ;Turn on Middle LED for ~3 seconds
+			
+			bl delayLong
+			
+			
+			bl threeLeft ;Turn on the Left LED for ~3 seconds
+			
+			bl delayLong ;delay for about 1 second because when first button is pressed, that signal extends to
+					   ;the next sequence, which will immediately count it wrong
+						
+			bl threeRight
+			
+			bl delayLong
+			
+			
+			bl twoLeft ;Turn on the Left LED for ~3 seconds
+			
+			bl delayMed ;delay for about 1 second because when first button is pressed, that signal extends to
+			
+			bl twoLeft ;Turn on the Left LED for ~3 seconds
+			
+			bl delayMed ;delay for about 1 second because when first button is pressed, that signal extends to
+
+			bl twoRight
+			
+			bl delayMed
+
+
+			bl twoRight ;Turn on Middle LED for ~3 seconds
+			
+			bl delayShort
+
+			bl twoLeft ;Turn on Middle LED for ~3 seconds
+			
+			bl delayShort
+			
+			bl twoMid ;Turn on Middle LED for ~3 seconds
+			
+			bl delayShort	
+
+			bl twoLeft ;Turn on Middle LED for ~3 seconds
+			
+			bl delayShort
+			
+			bl twoMid ;Turn on Middle LED for ~3 seconds
+			
+			bl delayShort
+			
+			bl twoMid ;Turn on Middle LED for ~3 seconds
+			
+			bl delayShort
+			
+			bl twoLeft ;Turn on Middle LED for ~3 seconds
+			
+			bl delayShort
+			
+			
+success		mov r3, #0x00 ;If button was not pressed value was 0x00 and cmp was non zero, Load pin 1 value
+			strb r3, [r0, #0x02]
+			mov r3, #0x00
+			strb r3, [r4, #0x02]
+			mov r12, #0x20000
+sucLoop1	sub r12, #1
+			cmp r12, #0
+			bne sucLoop1
+			mov r3, #0x0C
+			strb r3, [r4, #0x02]
+			mov r3, #0x07 ;If button was not pressed value was 0x00 and cmp was non zero, Load pin 1 value
+			strb r3, [r0, #0x02]
+			mov r12, #0x20000
+sucLoop2	sub r12, #1
+			cmp r12, #0
+			bne sucLoop2			
+			b success
+			
+			
+label		b label	;temporary loop
+
+Failure		;Turn off all LEDS and turn on a red light to indicate failure			
+			bl LED1OFF
+			bl LED2OFF
+			bl LED3OFF
+			cmp r6, #10
+			beq	firstFail
+
+			b gameOver ;Make gameover screen turn off all LED and go to start menu 
+			
+firstFail	
+			sub r6, #1
+			
+			mov r3, #0x00
+			strb r3, [r4, #0x02]
+			mov r12, #0x20000
+failLoop1	sub r12, #1
+			cmp r12, #0
+			bne failLoop1
+			mov r3, #0x0C
+			strb r3, [r4, #0x02]			
+			mov r12, #0x20000
+failLoop2	sub r12, #1
+			cmp r12, #0
+			bne failLoop2
+			mov r3, #0x00
+			strb r3, [r4, #0x02]
+			mov r12, #0x20000
+failLoop3	sub r12, #1
+			cmp r12, #0
+			bne failLoop3
+			mov r3, #0x0C
+			strb r3, [r4, #0x02]
+			mov r12, #0x20000
+failLoop4	sub r12, #1
+			cmp r12, #0
+			bne failLoop4
+			
+			mov r3, #0x04
+			strb r3, [r4, #0x02]
+			b start			
+			
+stay		b stay; temporary loop
+						
+			endp
+				
+gameOver	function
+			bl LED1OFF
+			bl LED2OFF
+			bl LED3OFF
+			mov r3, #0x00
+			strb r3, [r4, #0x02]
+			mov r12, #0x20000
+failLoop1_1	sub r12, #1
+			cmp r12, #0
+			bne failLoop1_1
+			mov r3, #0x04
+			strb r3, [r4, #0x02]			
+			mov r12, #0x20000
+failLoop2_1	sub r12, #1
+			cmp r12, #0
+			bne failLoop2_1
+			mov r3, #0x00
+			strb r3, [r4, #0x02]
+			mov r12, #0x20000
+failLoop3_1	sub r12, #1
+			cmp r12, #0
+			bne failLoop3_1
+			mov r3, #0x04
+			strb r3, [r4, #0x02]
+			mov r12, #0x20000
+failLoop4_1	sub r12, #1
+			cmp r12, #0
+			bne failLoop4_1						
+			mov r3, #0x00
+			strb r3, [r4, #0x02]	
+
+			b menu
+			endp
+
+LCDInit		function
+			;Will need to change the port this is used for at some point
+			LDR R0, =0x40004C20		; P3: control pins
+			LTORG
+			LDR R1, =0x40004C21	
+			LTORG		; P4: data or commands 		
+			MOV R2, #0xE0			; 1110 0000 
+			STRB R2, [R0, #0x04]	; outputs pins for EN, RW, RS
+			MOV R2, #0xFF
+			STRB R2, [R1, #0x04]	; All of Port 4 as output pins to LCD
+			
+			PUSH {LR}		
+			MOV R2, #0x38			; 2 lines, 7x5 characters, 8-bit mode		 
+			BL LCDCommand			; Send command in R2 to LCD
+			
+			MOV R2, #0x0E			; Turn on Display and Cursor
+			BL LCDCommand			; Send command in R2 to LCD
+			
+			MOV R2, #0x01			; Clear display screen
+			BL LCDCommand			; Send command in R2 to LCD
+			
+			MOV R2, #0x06			; Increment cursor right once
+			BL LCDCommand			; Send command in R2 to LCD
+				
+			POP {LR}			
+			BX LR
+			endp
+				
+				
+LEDInit		function	
+			ldr r0, =0x40004C00  ;Base address
+			ldr r1, =0x40004C00  ;Base address
+			ldr r4, =0x40004C00  ;Base address
+			add r0 ,#0x40 ;Port 5 Offset
+			add r1 ,#0x01 ;Port 2 Offset
+			add r4, #0x20 ;Port 3 Offset
+			
+			mov r2, #0x07 ;Port 5 pins 0 and 1 value
+			strb r2, [r0, #0x04] ;The 0 and 1 pins are outputting, therefore all other pins are inputting
+			mov r2, #0x04 ;Port 4 pins 0 and 1 value
+			strb r2, [r1, #0x04] ;The 0 and 1 pins are outputting, therefore all other pins are inputting
+			mov r2, #0x0C
+			strb r2, [r4, #0x04]
+			
+			mov r2, #0xE0 ;Pin 4 is inputting
+			strb r2, [r1, #0x06] ;REN pin 4
+			mov r2, #0x00 ;  Input value pull down
+			strb r2, [r1, #0x02]; output register
+			bx lr
+			endp
+			
+LCDCommand	function				; R2 brings in the command byte
+			STRB R2, [R1, #0x02]
+			MOV R2, #0x00			; RS = 0, command register selected, RW = 0, write to LCD
+			ORR R2, #EN
+			STRB R2, [R0, #0x02]	; EN = 1
+			PUSH {LR}
+			BL delay
+			
+			MOV R2, #0x00
+			STRB R2, [R0, #0x02]	; EN = 0 and RS = RW = 0	
+			POP {LR}
+			BX LR
+			endp				
+				
+LCDData		function				; R3 brings in the character byte
+			STRB R3, [R1, #0x02]
+			MOV R2, #0x00
+			ORR R2, #EN
+			ORR R2, #RS
+			STRB R2, [R0, #0x02]
+			PUSH {LR}
+			BL delay
+			
+			MOV R2, #0x00
+			ORR R2, #RS
+			STRB R2, [R0, #0x02]	; EN = 0 and RS = RW = 0
+		
+			POP {LR}
+			BX LR
+			endp
+				
+shiftRight	function				; R2 brings in the command byte
+			mov r3, #0x00
+			orr r3, #EN
+			orr r3, #RS
+			orr r3, #RW ;Make all 0 and store into r0
+			strb r3, [r0, #0x02]
+			push {lr}
+			bl delay
+			mov r3, #0x06
+			strb r3, [r0, #0x02]
+			mov r3, #0x00
+			orr r3, #RS
+			orr r3, #RW
+			mov r3, #0x01
+			orr r3, #EN
+			strb r3, [r0, #0x02]
+			pop {LR} 
+			bx LR
+			endp
+			
+greenON		function
+			mov r3, #0x04
+			strb r3, [r4, #0x02]
+			bx lr
+			endp
+				
+redON		function
+			mov r3, #0x08
+			strb r3, [r4, #0x02]
+			bx lr
+			endp
+				
+greenOFF	function
+			mov r3, #0x00
+			strb r3, [r4, #0x02]
+			bx lr
+			endp
+				
+redOFF		function
+			mov r3, #0x00
+			strb r3, [r4, #0x02]
+			bx lr
+			endp
+			
+LED1		function
+			ldrb r3, [r1, #0x00] ;Beging loop, load value from input pin into r2
+			and r3, #0x10 ;Mask r2 with 0x10
+			cmp r3, #0x10 ;Compare value with 0x01. If input was 1, button was pressed
+			beq LED1_JUMP ;If button was pressed and value was 0x01, then output of previous statement was 0, go to "jump"
+			mov r3, #0x00 ;Load value for pin 0
+			strb r3, [r0, #0x02] ;Set pin 0 HIGH and pin 1 LOW. Green light is ON;Code to turn off red LED 1
+			bx lr
+			endp
+				
+LED1_JUMP	function
+			mov r3, #0x01 ;If button was not pressed value was 0x00 and cmp was non zero, Load pin 1 value
+			strb r3, [r0, #0x02] ;Pin 1 HIGH pin 0 LOW, RED is ON
+			bx lr
+			endp
+
+LED1ON		function
+			mov r3, #0x01 ;If button was not pressed value was 0x00 and cmp was non zero, Load pin 1 value
+			strb r3, [r0, #0x02] ;Pin 1 HIGH pin 0 LOW, RED is ON
+			bx lr
+			endp
+
+LED1OFF		function
+			mov r3, #0x00 ;Load value for pin 0
+			strb r3, [r0, #0x02] ;Set pin 0 HIGH and pin 1 LOW. Green light is ON;Code to turn off red LED 1
+			bx lr
+			endp
+				
+LED2		function
+			ldrb r3, [r1, #0x00] ;Beging loop, load value from input pin into r2
+			and r3, #0x20 ;Mask r2 with 0x10
+			cmp r3, #0x20 ;Compare value with 0x01. If input was 1, button was pressed
+			beq LED2_JUMP ;If button was pressed and value was 0x01, then output of previous statement was 0, go to "jump"
+			mov r3, #0x00 ;Load value for pin 0
+			strb r3, [r0, #0x02] ;Set pin 0 HIGH and pin 1 LOW. Green light is ON;Code to turn off red LED 1
+			bx lr
+
+LED2_JUMP	
+			mov r3, #0x02 ;If button was not pressed value was 0x00 and cmp was non zero, Load pin 1 value
+			strb r3, [r0, #0x02] ;Pin 1 HIGH pin 0 LOW, RED is ON
+			bx lr
+			endp
+				
+LED2ON		function
+			mov r3, #0x02 ;If button was not pressed value was 0x00 and cmp was non zero, Load pin 1 value
+			strb r3, [r0, #0x02] ;Pin 1 HIGH pin 0 LOW, RED is ON
+			bx lr
+			endp
+
+LED2OFF		function
+			mov r3, #0x00 ;Load value for pin 0
+			strb r3, [r0, #0x02] ;Set pin 0 HIGH and pin 1 LOW. Green light is ON;Code to turn off red LED 1
+			bx lr
+			endp
+				
+LED3		function
+			ldrb r3, [r1, #0x00] ;Beging loop, load value from input pin into r2
+			and r3, #0x40 ;Mask r2 with 0x10
+			cmp r3, #0x40 ;Compare value with 0x01. If input was 1, button was pressed
+			beq LED3_JUMP ;If button was pressed and value was 0x01, then output of previous statement was 0, go to "jump"
+			mov r3, #0x00 ;Load value for pin 0
+			strb r3, [r0, #0x02] ;Set pin 0 HIGH and pin 1 LOW. Green light is ON;Code to turn off red LED 1
+			bx lr
+LED3_JUMP	
+			mov r3, #0x04 ;If button was not pressed value was 0x00 and cmp was non zero, Load pin 1 value
+			strb r3, [r0, #0x02] ;Pin 1 HIGH pin 0 LOW, RED is ON
+			bx lr
+			endp
+				
+LED3ON		function
+			mov r3, #0x04 ;If button was not pressed value was 0x00 and cmp was non zero, Load pin 1 value
+			strb r3, [r0, #0x02] ;Pin 1 HIGH pin 0 LOW, RED is ON
+			bx lr
+			endp
+
+LED3OFF		function
+			mov r3, #0x00 ;Load value for pin 0
+			strb r3, [r0, #0x02] ;Set pin 0 HIGH and pin 1 LOW. Green light is ON;Code to turn off red LED 1
+			bx lr
+			endp
+			
+gameSelect	function
+	
+			MOV R2, #0xC0			;Beginning of second line
+			BL LCDCommand
+			
+			MOV R3, #'2'			; Character 'S'	
+			BL LCDData
+			
+			MOV R3, #'-'			; Character 'S'	
+			BL LCDData
+			
+			MOV R3, #'W'			; Character 'S'	
+			BL LCDData
+			
+			MOV R3, #'h'			; Character 'S'	
+			BL LCDData
+			
+			MOV R3, #'a'			; Character 'S'	
+			BL LCDData
+			
+			MOV R3, #'c'			; Character 'S'	
+			BL LCDData
+			
+			MOV R3, #'k'			; Character 'S'	
+			BL LCDData
+			
+			MOV R3, #'-'			; Character 'S'	
+			BL LCDData
+			
+			MOV R3, #'a'			; Character 'S'	
+			BL LCDData
+			
+			MOV R3, #'-'			; Character 'S'	
+			BL LCDData
+			
+			MOV R3, #'M'			; Character 'S'	
+			BL LCDData
+			
+			MOV R3, #'o'			; Character 'S'	
+			BL LCDData
+			
+			MOV R3, #'l'			; Character 'S'	
+			BL LCDData
+			
+			MOV R3, #'e'			; Character 'S'	
+			BL LCDData
+			
+			b gameStart
+			endp
+				
+delayLong	function ;Creates a procedure called delay, must be ended with endp 
+			mov r12, #0x300 ;moves counting value for outer loop into r12
+Outer1		sub r12, #0x01 ;decrements outer loop
+			
+			mov r11, #0x300 ;moves counting value for inner loop into r11
+			
+Inner1		sub r11, #0x01 ;decrements inner loop
+			cmp r11, #0x00 ;compares inner counter to 0
+			BNE Inner1 ;If inner counter is not zero, jumps back to inner label
+			
+			cmp r12, #0x00 ;compares outer counter to 0
+			BNE Outer1; If outer counter is not zero, jumps back to outer label
+			BX LR; goes to the memory adress stored in LR register, acts as a function return
+			endp
+
+delayMed	function ;Creates a procedure called delay, must be ended with endp 
+			mov r12, #0x300 ;moves counting value for outer loop into r12
+O1			sub r12, #0x01 ;decrements outer loop
+			
+			mov r11, #0x200 ;moves counting value for inner loop into r11
+			
+I1			sub r11, #0x01 ;decrements inner loop
+			cmp r11, #0x00 ;compares inner counter to 0
+			BNE I1 ;If inner counter is not zero, jumps back to inner label
+			
+			cmp r12, #0x00 ;compares outer counter to 0
+			BNE O1; If outer counter is not zero, jumps back to outer label
+			BX LR; goes to the memory adress stored in LR register, acts as a function return
+			endp
+				
+				
+delayShort	function ;Creates a procedure called delay, must be ended with endp 
+			mov r12, #0x300 ;moves counting value for outer loop into r12
+O1_1		sub r12, #0x01 ;decrements outer loop
+			
+			mov r11, #0x100 ;moves counting value for inner loop into r11
+			
+I1_1		sub r11, #0x01 ;decrements inner loop
+			cmp r11, #0x00 ;compares inner counter to 0
+			BNE I1_1 ;If inner counter is not zero, jumps back to inner label
+			
+			cmp r12, #0x00 ;compares outer counter to 0
+			BNE O1_1; If outer counter is not zero, jumps back to outer label
+			BX LR; goes to the memory adress stored in LR register, acts as a function return
+			endp
+			
+			
+
+delay2s		function ;Creates a procedure called delay, must be ended with endp 
+			mov r12, #0x600 ;moves counting value for outer loop into r12
+Outer2		sub r12, #0x01 ;decrements outer loop
+			
+			mov r11, #0x300 ;moves counting value for inner loop into r11
+			
+Inner2		sub r11, #0x01 ;decrements inner loop
+			cmp r11, #0x00 ;compares inner counter to 0
+			BNE Inner2 ;If inner counter is not zero, jumps back to inner label
+			
+			cmp r12, #0x00 ;compares outer counter to 0
+			BNE Outer2; If outer counter is not zero, jumps back to outer label
+			BX LR; goes to the memory adress stored in LR register, acts as a function return
+			endp
+				
+delay3s		function ;Creates a procedure called delay, must be ended with endp 
+			mov r12, #0xC00 ;moves counting value for outer loop into r12
+Outer3		sub r12, #0x01 ;decrements outer loop
+			
+			mov r11, #0x300 ;moves counting value for inner loop into r11
+			
+Inner3		sub r11, #0x01 ;decrements inner loop
+			cmp r11, #0x00 ;compares inner counter to 0
+			BNE Inner3 ;If inner counter is not zero, jumps back to inner label
+			
+			cmp r12, #0x00 ;compares outer counter to 0
+			BNE Outer3; If outer counter is not zero, jumps back to outer label
+			BX LR; goes to the memory adress stored in LR register, acts as a function return
+			endp
+				
+				
+delay		function ;Creates a procedure called delay, must be ended with endp 
+			mov r12, #0x300 ;moves counting value for outer loop into r12
+Outer0		sub r12, #0x01 ;decrements outer loop			
+			cmp r12, #0x00 ;compares outer counter to 0
+			BNE Outer0; If outer counter is not zero, jumps back to outer label
+			BX LR; goes to the memory adress stored in LR register, acts as a function return
+			endp
+			
+threeLeft				function
+						mov r3, #0x01 ;If button was not pressed value was 0x00 and cmp was non zero, Load pin 1 value
+						strb r3, [r0, #0x02] ;Pin 1 HIGH pin 0 LOW, RED is ON
+						
+						mov r12, #0x50000 ;moves counting value for outer loop into r12, ~3 seconds
+OuterA					sub r12, #0x01 ;decrements outer loop
+						
+						ldrb r3, [r1, #0x00] ;Beging loop, load value from input pin into r2
+						and r3, #0x10 ;Mask r2 with 0x10
+						cmp r3, #0x10 ;Compare value with 0x01. If input was 1, button was pressed
+						beq seq1Pass
+						
+						ldrb r3, [r1, #0x00] ;Beging loop, load value from input pin into r2
+						and r3, #0x20 ;Mask r2 with 0x10
+						cmp r3, #0x20 ;Compare value with 0x01. If input was 1, button was pressed
+						beq Failure
+						
+						ldrb r3, [r1, #0x00] ;Beging loop, load value from input pin into r2
+						and r3, #0x40 ;Mask r2 with 0x10
+						cmp r3, #0x40 ;Compare value with 0x01. If input was 1, button was pressed
+						beq Failure
+						
+						cmp r12, #0x00 ;compares outer counter to 0
+						BNE OuterA; If outer counter is not zero, jumps back to outer label
+						b Failure
+seq1Pass				mov r3, #0x00 ;If button was not pressed value was 0x00 and cmp was non zero, Load pin 1 value
+						strb r3, [r0, #0x02]						
+						bx lr
+						endp
+			
+threeMid				function
+						mov r3, #0x02 ;If button was not pressed value was 0x00 and cmp was non zero, Load pin 1 value
+						strb r3, [r0, #0x02] ;Pin 1 HIGH pin 0 LOW, RED is ON
+						mov r12, #0x50000 ;moves counting value for outer loop into r12
+OuterB					sub r12, #0x01 ;decrements outer loop
+						
+						ldrb r3, [r1, #0x00] ;Beging loop, load value from input pin into r2
+						and r3, #0x10 ;Mask r2 with 0x10
+						cmp r3, #0x10 ;Compare value with 0x01. If input was 1, button was pressed
+						beq Failure
+						
+						ldrb r3, [r1, #0x00] ;Beging loop, load value from input pin into r2
+						and r3, #0x20 ;Mask r2 with 0x10
+						cmp r3, #0x20 ;Compare value with 0x01. If input was 1, button was pressed
+						beq seq2Pass
+						
+						ldrb r3, [r1, #0x00] ;Beging loop, load value from input pin into r2
+						and r3, #0x40 ;Mask r2 with 0x10
+						cmp r3, #0x40 ;Compare value with 0x01. If input was 1, button was pressed
+						beq Failure
+						
+						cmp r12, #0x00 ;compares outer counter to 0
+						BNE OuterB; If outer counter is not zero, jumps back to outer label
+						b Failure
+seq2Pass				mov r3, #0x00 ;If button was not pressed value was 0x00 and cmp was non zero, Load pin 1 value
+						strb r3, [r0, #0x02]						
+						bx lr
+						endp
+
+
+threeRight				function
+						mov r3, #0x04 ;If button was not pressed value was 0x00 and cmp was non zero, Load pin 1 value
+						strb r3, [r0, #0x02]
+						mov r12, #0x50000 ;moves counting value for outer loop into r12
+OuterC					sub r12, #0x01 ;decrements outer loop						
+						
+						ldrb r3, [r1, #0x00] ;Beging loop, load value from input pin into r2
+						and r3, #0x10 ;Mask r2 with 0x10
+						cmp r3, #0x10 ;Compare value with 0x01. If input was 1, button was pressed
+						beq Failure
+						
+						ldrb r3, [r1, #0x00] ;Beging loop, load value from input pin into r2
+						and r3, #0x20 ;Mask r2 with 0x10
+						cmp r3, #0x20 ;Compare value with 0x01. If input was 1, button was pressed
+						beq Failure
+						
+						ldrb r3, [r1, #0x00] ;Beging loop, load value from input pin into r2
+						and r3, #0x40 ;Mask r2 with 0x10
+						cmp r3, #0x40 ;Compare value with 0x01. If input was 1, button was pressed
+						beq seq3Pass
+						
+						cmp r12, #0x00 ;compares outer counter to 0
+						BNE OuterC; If outer counter is not zero, jumps back to outer label
+						b Failure
+seq3Pass				mov r3, #0x00 ;If button was not pressed value was 0x00 and cmp was non zero, Load pin 1 value
+						strb r3, [r0, #0x02]						
+						bx lr
+						endp
+					
+							
+twoLeft					function
+						mov r3, #0x01 ;If button was not pressed value was 0x00 and cmp was non zero, Load pin 1 value
+						strb r3, [r0, #0x02] ;Pin 1 HIGH pin 0 LOW, RED is ON
+						mov r12, #0x20000 ;moves counting value for outer loop into r12
+OuterA_1				sub r12, #0x01 ;decrements outer loop
+						
+						ldrb r3, [r1, #0x00] ;Beging loop, load value from input pin into r2
+						and r3, #0x10 ;Mask r2 with 0x10
+						cmp r3, #0x10 ;Compare value with 0x01. If input was 1, button was pressed
+						beq seq4Pass
+						
+						ldrb r3, [r1, #0x00] ;Beging loop, load value from input pin into r2
+						and r3, #0x20 ;Mask r2 with 0x10
+						cmp r3, #0x20 ;Compare value with 0x01. If input was 1, button was pressed
+						beq Failure
+						
+						ldrb r3, [r1, #0x00] ;Beging loop, load value from input pin into r2
+						and r3, #0x40 ;Mask r2 with 0x10
+						cmp r3, #0x40 ;Compare value with 0x01. If input was 1, button was pressed
+						beq Failure
+						
+						cmp r12, #0x00 ;compares outer counter to 0
+						BNE OuterA_1; If outer counter is not zero, jumps back to outer label
+						b Failure
+seq4Pass				mov r3, #0x00 ;If button was not pressed value was 0x00 and cmp was non zero, Load pin 1 value
+						strb r3, [r0, #0x02]
+						bx lr
+						endp
+			
+twoMid					function
+						mov r3, #0x02 ;If button was not pressed value was 0x00 and cmp was non zero, Load pin 1 value
+						strb r3, [r0, #0x02] ;Pin 1 HIGH pin 0 LOW, RED is ON
+						mov r12, #0x20000 ;moves counting value for outer loop into r12
+OuterB_1				sub r12, #0x01 ;decrements outer loop
+
+						
+						ldrb r3, [r1, #0x00] ;Beging loop, load value from input pin into r2
+						and r3, #0x10 ;Mask r2 with 0x10
+						cmp r3, #0x10 ;Compare value with 0x01. If input was 1, button was pressed
+						beq Failure
+						
+						ldrb r3, [r1, #0x00] ;Beging loop, load value from input pin into r2
+						and r3, #0x20 ;Mask r2 with 0x10
+						cmp r3, #0x20 ;Compare value with 0x01. If input was 1, button was pressed
+						beq seq5Pass
+						
+						ldrb r3, [r1, #0x00] ;Beging loop, load value from input pin into r2
+						and r3, #0x40 ;Mask r2 with 0x10
+						cmp r3, #0x40 ;Compare value with 0x01. If input was 1, button was pressed
+						beq Failure
+
+						cmp r12, #0x00 ;compares outer counter to 0
+						BNE OuterB_1; If outer counter is not zero, jumps back to outer label
+						b Failure
+seq5Pass				mov r3, #0x00 ;If button was not pressed value was 0x00 and cmp was non zero, Load pin 1 value
+						strb r3, [r0, #0x02]						
+						bx lr
+						endp
+
+
+twoRight				function
+						mov r3, #0x04 ;If button was not pressed value was 0x00 and cmp was non zero, Load pin 1 value
+						strb r3, [r0, #0x02]
+						mov r12, #0x20000 ;moves counting value for outer loop into r12
+OuterC_1				sub r12, #0x01 ;decrements outer loop
+
+						
+						ldrb r3, [r1, #0x00] ;Beging loop, load value from input pin into r2
+						and r3, #0x10 ;Mask r2 with 0x10
+						cmp r3, #0x10 ;Compare value with 0x01. If input was 1, button was pressed
+						beq Failure
+						
+						ldrb r3, [r1, #0x00] ;Beging loop, load value from input pin into r2
+						and r3, #0x20 ;Mask r2 with 0x10
+						cmp r3, #0x20 ;Compare value with 0x01. If input was 1, button was pressed
+						beq Failure
+						
+						ldrb r3, [r1, #0x00] ;Beging loop, load value from input pin into r2
+						and r3, #0x40 ;Mask r2 with 0x10
+						cmp r3, #0x40 ;Compare value with 0x01. If input was 1, button was pressed
+						beq seq6Pass
+
+						
+						cmp r12, #0x00 ;compares outer counter to 0
+						BNE OuterC_1; If outer counter is not zero, jumps back to outer label
+						b Failure
+seq6Pass				mov r3, #0x00 ;If button was not pressed value was 0x00 and cmp was non zero, Load pin 1 value
+						strb r3, [r0, #0x02]						
+						bx lr
+						endp										
+			
+			end
+
+
